@@ -1,0 +1,15 @@
+{
+    "name": "notifizz/php",
+    "description": "Notifizz SDK for PHP",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Notifizz\\": "src/"
+        }
+    },
+    "require": {
+        "php": ">=8.0",
+        "guzzlehttp/guzzle": "^7.0"
+    }
+}
