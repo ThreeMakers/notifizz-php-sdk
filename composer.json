@@ -1,6 +1,6 @@
 {
     "name": "notifizz/php",
-    "description": "Notifizz SDK for PHP",
+    "description": "Private Notifizz SDK for PHP",
     "type": "library",
     "license": "MIT",
     "autoload": {
