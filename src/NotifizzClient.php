@@ -19,10 +19,12 @@ class NotifizzClient
         'autoSendDelayMs' => 1000,
     ];
 
+
     private static array $enrichFunctions = [];
 
     public function __construct(string $authSecretKey, string $sdkSecretKey)
     {
+        echo 'test';
         $this->authSecretKey = $authSecretKey;
         $this->sdkSecretKey = $sdkSecretKey;
     }
