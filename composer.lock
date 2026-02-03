@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "255ca036f189c5212e9c304c603cca9e",
+    "content-hash": "31596f000f1c2b6b6a53ed14f279485c",
     "packages": [
         {
             "name": "guzzlehttp/guzzle",
@@ -332,6 +332,32 @@
             "time": "2025-08-23T21:21:41+00:00"
         },
         {
+            "name": "notifizz/php",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "../../../../notifizz-php-sdk",
+                "reference": "a4abd865d16b65ce215529e79b3fd114a4ab127d"
+            },
+            "require": {
+                "guzzlehttp/guzzle": "^7.0",
+                "php": ">=8.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Notifizz\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Notifizz SDK for PHP",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
             "name": "psr/http-client",
             "version": "1.0.3",
             "source": {
@@ -606,7 +632,9 @@
     "packages-dev": [],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": {
+        "notifizz/php": 20
+    },
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {

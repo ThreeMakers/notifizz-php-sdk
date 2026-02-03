@@ -6,12 +6,15 @@ use GuzzleHttp\Client;
 use Exception;
 
 require_once __DIR__ . '/TrackContext.php';
+
+
 class NotifizzClient
 {
     private string $authSecretKey;
     private string $sdkSecretKey;
     private string $baseUrl = 'http://localhost:6001/v1';
     private string $algorithm = 'sha256';
+
     private array $options = [
         'autoSendDelayMs' => 1000,
     ];
@@ -76,7 +79,7 @@ class NotifizzClient
 
             return json_decode($response->getBody(), true);
         } catch (Exception $e) {
-            error_log("Error: " . $e->getMessage());
+            error_log("Error while sending notification: " . $e->getMessage());
             throw $e;
         }
     }

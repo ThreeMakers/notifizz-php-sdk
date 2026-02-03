@@ -1,8 +1,21 @@
 {
-    "name": "notifizz/php",
-    "description": "Private Notifizz SDK for PHP",
+    "name": "notifizz/notifizz-php",
+    "version": "1.0.0",
+    "description": "Official Notifizz SDK for PHP",
     "type": "library",
     "license": "MIT",
+    "keywords": ["notifizz", "sdk", "notifications"],
+    "homepage": "https://github.com/notifizz/notifizz",
+    "support": {
+        "issues": "https://github.com/notifizz/notifizz/issues",
+        "source": "https://github.com/notifizz/notifizz"
+    },
+    "authors": [
+        {
+            "name": "Notifizz",
+            "homepage": "https://github.com/notifizz"
+        }
+    ],
     "autoload": {
         "psr-4": {
             "Notifizz\\": "src/"

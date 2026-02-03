@@ -1,7 +1,1 @@
 /vendor/
-
-composer.lock
-
-# Ignore IDE settings
-.idea/
-.vscode/
