@@ -1,6 +1,6 @@
 {
     "name": "notifizz/notifizz-php",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "Official Notifizz SDK for PHP",
     "type": "library",
     "license": "MIT",

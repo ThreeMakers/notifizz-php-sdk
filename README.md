@@ -18,14 +18,57 @@ composer require notifizz/notifizz-php
 require_once __DIR__ . '/vendor/autoload.php';
 
 use Notifizz\NotifizzClient;
-use Notifizz\TrackContext;
 
 $client = new NotifizzClient('your-auth-secret', 'your-sdk-secret');
 
-$context = $client->track('user-123', 'event-name');
-$context->setProperty('key', 'value');
-$context->send();
+// Track an event with workflows (chain workflow() then send())
+$client->track([
+    'eventName' => 'user_signed_up',
+    'sdkSecretKey' => 'your-sdk-secret',
+    'properties' => [
+        'plan' => 'pro',
+        'source' => 'landing_page',
+    ],
+])->workflow('campaign_123', [
+    ['id' => 'user_1', 'email' => 'user1@example.com'],
+    ['id' => 'user_2', 'email' => 'user2@example.com'],
+])->send();
+
+// Generate a hashed token for backend auth (e.g. Notification Center)
+$token = $client->generateHashedToken('user_123');
+
+// Send a notification to the Notification Center
+$client->send([
+    'notifId' => 'notif_123',
+    'properties' => [
+        'recipients' => [
+            ['id' => 'user_1', 'email' => 'user@example.com'],
+        ],
+        'message' => 'Hello world',
+    ],
+]);
+
+// Optional: configure base URL or auto-send delay
+$client->config([
+    'baseUrl' => 'https://eu.api.notifizz.com/v1',
+    'autoSendDelayMs' => 1000,
+]);
 ```
+
+You can chain multiple `->workflow($campaignId, $recipients)` calls before `->send()`.
+
+## API summary
+
+| Method | Description |
+|--------|-------------|
+| `new NotifizzClient($authSecretKey, $sdkSecretKey)` | Create a client. |
+| `$client->track(['eventName', 'sdkSecretKey', 'properties'])` | Start tracking an event; returns a context. |
+| `$context->workflow($campaignId, $recipients)` | Attach a workflow and recipients (chainable). |
+| `$context->send()` | Send the tracked event (call after workflow()). |
+| `$client->generateHashedToken($userId)` | Generate a hashed token for the user. |
+| `NotifizzClient::configureEnrich($workflowIds, $fn)` | Register an enrichment function for workflow(s). |
+| `$client->send(['notifId', 'properties'])` | Send a notification to the Notification Center. |
+| `$client->config(['baseUrl'?, 'autoSendDelayMs'?])` | Configure options. |
 
 ## Publishing new versions (maintainers)
 
