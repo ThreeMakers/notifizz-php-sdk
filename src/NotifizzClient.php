@@ -10,9 +10,10 @@ require_once __DIR__ . '/TrackContext.php';
 
 class NotifizzClient
 {
+    private const DEFAULT_BASE_URL = 'https://eu.api.notifizz.com/v1';
+
     private string $authSecretKey;
     private string $sdkSecretKey;
-    private string $baseUrl = 'http://localhost:6001/v1';
     private string $algorithm = 'sha256';
 
     private array $options = [
@@ -24,7 +25,6 @@ class NotifizzClient
 
     public function __construct(string $authSecretKey, string $sdkSecretKey)
     {
-        echo 'test';
         $this->authSecretKey = $authSecretKey;
         $this->sdkSecretKey = $sdkSecretKey;
     }
@@ -49,7 +49,8 @@ class NotifizzClient
 
     public function track(array $props): TrackContext
     {
-        return new TrackContext($props, $this->options, $this->sdkSecretKey);
+        $baseUrl = $this->options['baseUrl'] ?? self::DEFAULT_BASE_URL;
+        return new TrackContext($props, $this->options, $this->sdkSecretKey, $baseUrl);
     }
 
     public function config(array $opts): void
@@ -65,8 +66,9 @@ class NotifizzClient
             $recipients = $request['properties']['recipients'] ?? [];
             unset($request['properties']['recipients']);
 
+            $baseUrl = $this->options['baseUrl'] ?? self::DEFAULT_BASE_URL;
             $response = $client->post(
-                "{$this->baseUrl}/notification/channel/notificationcenter/config/{$request['notifId']}/track",
+                "{$baseUrl}/notification/channel/notificationcenter/config/{$request['notifId']}/track",
                 [
                     'headers' => [
                         'Authorization' => "Bearer {$this->sdkSecretKey}",

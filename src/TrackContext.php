@@ -7,18 +7,21 @@ use Exception;
 
 class TrackContext
 {
+    private const DEFAULT_BASE_URL = 'https://eu.api.notifizz.com/v1';
+
     private array $event;
     private array $workflows = [];
     private bool $hasSent = false;
     private array $options;
     private string $sdkSecretKey;
-    private string $baseUrl = 'http://localhost:6001/v1';
+    private string $baseUrl;
 
-    public function __construct(array $event, array $options, string $sdkSecretKey)
+    public function __construct(array $event, array $options, string $sdkSecretKey, ?string $baseUrl = null)
     {
         $this->event = $event;
         $this->options = $options;
         $this->sdkSecretKey = $sdkSecretKey;
+        $this->baseUrl = $baseUrl ?? self::DEFAULT_BASE_URL;
     }
 
     public function workflow(string $campaignId, array $recipients): self
