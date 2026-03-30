@@ -47,6 +47,13 @@ class NotifizzClient
         }
     }
 
+    public function event(array $props): TrackContext
+    {
+        $baseUrl = $this->options['baseUrl'] ?? self::DEFAULT_BASE_URL;
+        return new TrackContext($props, $this->options, $this->sdkSecretKey, $baseUrl);
+    }
+
+    /** @deprecated Use event() instead. */
     public function track(array $props): TrackContext
     {
         $baseUrl = $this->options['baseUrl'] ?? self::DEFAULT_BASE_URL;
