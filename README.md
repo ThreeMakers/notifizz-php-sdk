@@ -1,13 +1,13 @@
 # Notifizz PHP SDK
 
-Official Notifizz SDK for PHP. The package is published on [Packagist](https://packagist.org/packages/notifizz/notifizz-php) from the public repo [ThreeMakers/notifizz-php-sdk](https://github.com/ThreeMakers/notifizz-php-sdk).
+Official Notifizz SDK for PHP. The package is published on [Packagist](https://packagist.org/packages/notifizz/php) from the public repo [ThreeMakers/notifizz-php-sdk](https://github.com/ThreeMakers/notifizz-php-sdk).
 
 ## Installing the SDK
 
 No custom repository or credentials are required; Packagist is used by default.
 
 ```bash
-composer require notifizz/notifizz-php
+composer require notifizz/php
 ```
 
 ## Usage
@@ -18,57 +18,97 @@ composer require notifizz/notifizz-php
 require_once __DIR__ . '/vendor/autoload.php';
 
 use Notifizz\NotifizzClient;
+use Notifizz\JsonSchema;
 
-$client = new NotifizzClient('your-auth-secret', 'your-sdk-secret');
+// The 3rd arg (webhook signing secret) is required to expose enrichers via dispatch().
+$client = new NotifizzClient('your-auth-secret', 'your-sdk-secret', 'your-webhook-signing-secret');
 
-// Track an event with workflows (chain workflow() then send())
-$client->track([
-    'eventName' => 'user_signed_up',
-    'sdkSecretKey' => 'your-sdk-secret',
-    'properties' => [
-        'plan' => 'pro',
-        'source' => 'landing_page',
-    ],
-])->workflow('campaign_123', [
-    ['id' => 'user_1', 'email' => 'user1@example.com'],
-    ['id' => 'user_2', 'email' => 'user2@example.com'],
-])->send();
+// ── Track events ────────────────────────────────────────────────
+// Campaign resolution + recipient building happen server-side off the
+// orchestrator. No client-side workflow targeting.
+$client->track('user_signed_up', ['plan' => 'pro', 'source' => 'landing_page']);
+$client->track('user_signed_up', ['plan' => 'pro'], 'job-42'); // explicit idempotency key
 
-// Generate a hashed token for backend auth (e.g. Notification Center)
+// Declare an event + schema so the orchestrator knows its shape (and track()
+// can validate payloads locally — see schema modes below).
+$client->declareEvent('order.shipped', [
+    'description' => 'Triggered when an order ships',
+    'schema' => JsonSchema::object()
+        ->prop('orderId', JsonSchema::string(), true)
+        ->prop('userId', JsonSchema::string(), true)
+        ->build(),
+    'idempotencyFields' => ['orderId'],
+]);
+
+// ── Enrichers — fetch live business data at notification time ────
+$client->enricher('enrichOrder', [
+    'description' => 'Fetches an order by id',
+    'input' => JsonSchema::object()->prop('orderId', JsonSchema::string()->minLength(1), true)->build(),
+    'output' => JsonSchema::object()->prop('order', JsonSchema::object(), false)->build(),
+    'cache' => ['ttl' => 600],
+    'handler' => fn(array $params) => ['order' => $orders->find($params['orderId'])],
+]);
+
+// One-line webhook controller — Notifizz calls it for discovery + execution:
+//   return $client->dispatch($request->getParsedBody());
+
+// Audience profile resolver (the reserved notifizz:profileResolver enricher):
+$client->enrichProfileData(fn(array $params) => ['name' => 'Alice', 'plan' => 'VIP']);
+
+// ── Audience identity ───────────────────────────────────────────
+$client->identify([
+    'environmentId' => 'env_abc',
+    'subjectA' => ['type' => 'AppUserSubject', 'identifier' => 'u_1'],
+    'subjectB' => ['type' => 'EmailSubject', 'identifier' => 'a@b.com'],
+    'consentBasis' => 'transactional',
+]);
+
+// ── Subscriptions ───────────────────────────────────────────────
+$client->subscribe('proj_123', 'user_42');
+$client->notifySubscribers('proj_123', ['title' => 'New comment']);
+
+// ── Widget auth (generate tokens server-side) ───────────────────
 $token = $client->generateHashedToken('user_123');
+$subscribeToken = $client->generateSubscribeToken('user_42', 'proj_123');
 
-// Send a notification to the Notification Center
-$client->send([
-    'notifId' => 'notif_123',
-    'properties' => [
-        'recipients' => [
-            ['id' => 'user_1', 'email' => 'user@example.com'],
-        ],
-        'message' => 'Hello world',
-    ],
-]);
-
-// Optional: configure base URL or auto-send delay
-$client->config([
-    'baseUrl' => 'https://eu.api.notifizz.com/v1',
-    'autoSendDelayMs' => 1000,
-]);
+// Optional: configure base URL
+$client->config(['baseUrl' => 'https://eu.api.notifizz.com/v1']);
 ```
 
-You can chain multiple `->workflow($campaignId, $recipients)` calls before `->send()`.
+### Schema modes (soft / strict)
+
+When an event is declared with a schema, `track()` validates payloads locally.
+In `soft` mode (default) a mismatch logs a warning and still pushes; in `strict`
+mode it throws `TrackRejectedException` and does not push. Overridable at boot via
+the `NOTIFIZZ_SCHEMA_MODE` env var.
+
+```php
+$client = new NotifizzClient('auth', 'sdk', 'signing', [
+    'schemaMode' => 'strict',
+    'onError' => fn($event, $reason, $payload) => error_log("rejected: {$event}"),
+]);
+```
 
 ## API summary
 
 | Method | Description |
 |--------|-------------|
-| `new NotifizzClient($authSecretKey, $sdkSecretKey)` | Create a client. |
-| `$client->track(['eventName', 'sdkSecretKey', 'properties'])` | Start tracking an event; returns a context. |
-| `$context->workflow($campaignId, $recipients)` | Attach a workflow and recipients (chainable). |
-| `$context->send()` | Send the tracked event (call after workflow()). |
-| `$client->generateHashedToken($userId)` | Generate a hashed token for the user. |
-| `NotifizzClient::configureEnrich($workflowIds, $fn)` | Register an enrichment function for workflow(s). |
-| `$client->send(['notifId', 'properties'])` | Send a notification to the Notification Center. |
-| `$client->config(['baseUrl'?, 'autoSendDelayMs'?])` | Configure options. |
+| `new NotifizzClient($authKey, $sdkKey, $webhookSigningSecret = null, array $clientOptions = [])` | Create a client. |
+| `$client->track($eventName, $properties = [], $idempotencyKey = null)` | Track an event (local schema validation, idempotency, retries). |
+| `$client->declareEvent($name, $options)` | Declare an event + optional schema in the catalog. |
+| `$client->declaredEvents()` | Discovery view of declared events. |
+| `$client->enricher($name, $options)` | Register an enricher (input/output schema + handler + cache). |
+| `$client->enrichProfileData($handler)` | Register the system profile-resolver enricher. |
+| `$client->enrichers()` | Discovery view of registered enrichers. |
+| `$client->dispatch($body)` | Webhook entry point — discovery + enricher execution (HMAC-verified). |
+| `NotifizzClient::signDispatchPayload($secret, $payload)` | Compute the dispatch HMAC (testing helper). |
+| `$client->identify($params)` / `$client->detach($params)` | Link / unlink Audience Subjects. |
+| `$client->subscribe($resourceId, $subscriberId, $meta = [])` | Subscribe a user to a resource. |
+| `$client->unsubscribe($resourceId, $subscriberId)` | Unsubscribe a user. |
+| `$client->notifySubscribers($resourceId, $properties = [])` | Notify all subscribers of a resource. |
+| `$client->generateHashedToken($userId)` | Generate a widget auth token. |
+| `$client->generateSubscribeToken($subscriberId, $resourceId)` | Generate a Subscribe-widget token. |
+| `$client->config(['baseUrl'?])` | Configure options. |
 
 ## Publishing new versions (maintainers)
 
@@ -93,4 +133,4 @@ The SDK is developed in this private repo under `sdk/back-end/php-sdk/`. When yo
 
 1. Bump the `version` in `sdk/back-end/php-sdk/composer.json` (e.g. `1.0.1`).
 2. Commit, push, and merge to `main` (e.g. via a PR).
-3. The workflow runs: syncs `sdk/back-end/php-sdk/` to the public repo, commits and pushes there, creates tag `v<version>` on the public repo, then triggers Packagist. Users get the new version with `composer update notifizz/notifizz-php`.
+3. The workflow runs: syncs `sdk/back-end/php-sdk/` to the public repo, commits and pushes there, creates tag `v<version>` on the public repo, then triggers Packagist. Users get the new version with `composer update notifizz/php`.
