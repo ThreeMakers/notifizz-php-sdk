@@ -22,7 +22,7 @@ use GuzzleHttp\Exception\ConnectException;
  */
 class NotifizzClient
 {
-    private const DEFAULT_BASE_URL = 'https://eu.api.notifizz.com/v1';
+    private const DEFAULT_BASE_URL = 'https://api.notifizz.com/v1';
     private const RETRY_DELAYS_MS = [1000, 2000];
     /** Reserved name of the system enricher backing {@see enrichProfileData()}. */
     private const PROFILE_RESOLVER_ENRICHER = 'notifizz:profileResolver';

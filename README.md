@@ -72,7 +72,7 @@ $token = $client->generateHashedToken('user_123');
 $subscribeToken = $client->generateSubscribeToken('user_42', 'proj_123');
 
 // Optional: configure base URL
-$client->config(['baseUrl' => 'https://eu.api.notifizz.com/v1']);
+$client->config(['baseUrl' => 'https://api.notifizz.com/v1']);
 ```
 
 ### Schema modes (soft / strict)
