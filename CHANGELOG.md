@@ -2,6 +2,18 @@
 
 All notable changes to `notifizz/php` are documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] — 2026-08-04
+
+### Added
+
+- **`track(..., occurredAt: ...)`** — when the BUSINESS event actually happened, as opposed to when Notifizz receives it. Accepts an ISO 8601 string or a `DateTimeInterface`; omitted from the request when you don't pass it. Named arguments keep the call readable:
+
+  ```php
+  $client->track('order.shipped', ['orderId' => $id], occurredAt: $shippedAt);
+  ```
+
+  Use it only when the two genuinely differ — replaying, batching offline, backfilling history. A date in the future is refused by the API (`event/invalid-occurred-at`, small clock skew tolerated).
+
 ## [2.0.0] — 2026-06-28 (Breaking)
 
 The next release collapses the SDK around the flat `track()` shape and removes the channel-bypass surface. Both removals cascade from the event-driven model — emit an event, let a campaign decide channel and recipients server-side.

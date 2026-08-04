@@ -205,10 +205,23 @@ class NotifizzClient
      * transient failures (5xx / network); never retries 4xx (client errors) —
      * that would mask the rejection behind the server's idempotency replay.
      *
+     * `$occurredAt` (ISO 8601, or a DateTimeInterface) says when the BUSINESS
+     * event actually happened, as opposed to when Notifizz receives it. Omit it
+     * in the common case (you track at the moment it happens); pass it when
+     * replaying, batching offline, or backfilling history — named arguments keep
+     * it readable: `track('order.shipped', $props, occurredAt: $when)`.
+     * A date in the future is refused by the API (small clock skew tolerated):
+     * the value feeds time-scoped resolutions server-side, so it must never
+     * claim a state that does not exist yet.
+     *
      * @throws TrackRejectedException when schemaMode === 'strict' and the event is rejected locally.
      */
-    public function track(string $eventName, array $properties = [], ?string $idempotencyKey = null): void
-    {
+    public function track(
+        string $eventName,
+        array $properties = [],
+        ?string $idempotencyKey = null,
+        string|\DateTimeInterface|null $occurredAt = null,
+    ): void {
         $this->maybeHeartbeat();
 
         $validatedName = $this->validateForTrack($eventName, $properties);
@@ -225,6 +238,13 @@ class NotifizzClient
             'sdkSecretKey' => $this->sdkSecretKey,
             'idempotencyKey' => $resolvedKey,
         ];
+        // Left out entirely when undeclared: the API reads an absent field as
+        // "reception time is the only truth", right for the common case.
+        if ($occurredAt !== null) {
+            $payload['occurredAt'] = $occurredAt instanceof \DateTimeInterface
+                ? $occurredAt->format(\DateTimeInterface::ATOM)
+                : $occurredAt;
+        }
 
         $client = new Client();
         $lastError = null;
