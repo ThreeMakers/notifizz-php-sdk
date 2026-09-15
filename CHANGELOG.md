@@ -2,6 +2,12 @@
 
 All notable changes to `notifizz/php` are documented in this file. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+
+- **`expiresAt` on `identify`.** A link between two Subjects no longer carries an expiry date. The option was accepted but never enforced, and enforcing it would have split links that were meant to be permanent. To undo a link, call `detach`. A request that still sends `expiresAt` is accepted and the field is ignored.
+
 ## [2.1.0] — 2026-08-04
 
 ### Added

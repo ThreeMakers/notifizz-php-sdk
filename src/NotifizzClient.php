@@ -287,8 +287,8 @@ class NotifizzClient
 
     /**
      * Link two Subjects to the same Audience. Expected keys: environmentId,
-     * subjectA {type, identifier}, subjectB {type, identifier}, consentBasis,
-     * optional expiresAt.
+     * subjectA {type, identifier}, subjectB {type, identifier}, consentBasis.
+     * A link does not expire: call detach() to undo it.
      *
      * @return array response body ({ action, audienceId? }).
      */
