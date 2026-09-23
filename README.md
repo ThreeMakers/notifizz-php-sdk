@@ -60,7 +60,6 @@ $client->identify([
     'environmentId' => 'env_abc',
     'subjectA' => ['type' => 'AppUserSubject', 'identifier' => 'u_1'],
     'subjectB' => ['type' => 'EmailSubject', 'identifier' => 'a@b.com'],
-    'consentBasis' => 'transactional',
 ]);
 
 // ── Subscriptions ───────────────────────────────────────────────

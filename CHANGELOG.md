@@ -4,6 +4,10 @@ All notable changes to `notifizz/php` are documented in this file. Format follow
 
 ## [Unreleased]
 
+### Deprecated
+
+- **`consentBasis` on `identify`.** The API accepts and ignores it: Notifizz does not record a legal basis for a link — as the controller, your organisation holds it. Omit it from the params.
+
 ### Removed
 
 - **`expiresAt` on `identify`.** A link between two Subjects no longer carries an expiry date. The option was accepted but never enforced, and enforcing it would have split links that were meant to be permanent. To undo a link, call `detach`. A request that still sends `expiresAt` is accepted and the field is ignored.
