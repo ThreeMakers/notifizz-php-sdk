@@ -63,7 +63,7 @@ $client->identify([
 ]);
 
 // ── Subscriptions ───────────────────────────────────────────────
-$client->subscribe('proj_123', 'user_42');
+// Subscriptions are created by the person's own click in the widget — there is no server-side subscribe.
 $client->notifySubscribers('proj_123', ['title' => 'New comment']);
 
 // ── Widget auth (generate tokens server-side) ───────────────────
@@ -102,8 +102,7 @@ $client = new NotifizzClient('auth', 'sdk', 'signing', [
 | `$client->dispatch($body)` | Webhook entry point — discovery + enricher execution (HMAC-verified). |
 | `NotifizzClient::signDispatchPayload($secret, $payload)` | Compute the dispatch HMAC (testing helper). |
 | `$client->identify($params)` / `$client->detach($params)` | Link / unlink Audience Subjects. |
-| `$client->subscribe($resourceId, $subscriberId, $meta = [])` | Subscribe a user to a resource. |
-| `$client->unsubscribe($resourceId, $subscriberId)` | Unsubscribe a user. |
+| `$client->subscribe(…)` / `$client->unsubscribe(…)` | **Not supported** — a subscription is created only by the person's own click in the widget. Will be removed from the SDK. |
 | `$client->notifySubscribers($resourceId, $properties = [])` | Notify all subscribers of a resource. |
 | `$client->generateHashedToken($userId)` | Generate a widget auth token. |
 | `$client->generateSubscribeToken($subscriberId, $resourceId)` | Generate a Subscribe-widget token. |
