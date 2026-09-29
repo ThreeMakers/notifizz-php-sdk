@@ -16,8 +16,9 @@ use GuzzleHttp\Exception\ConnectException;
  *    calls for discovery and execution.
  *  - Event catalog — {@see declareEvent()} declares events + schemas, surfaced
  *    through the same discovery dispatch.
- *  - Audience — {@see identify()} / {@see detach()} link and unlink Subjects.
- *  - Subscriptions — {@see subscribe()} / {@see unsubscribe()} / {@see notifySubscribers()}.
+ *  - Audience — {@see identify()} / {@see detach()} link and unlink Subjects;
+ *    {@see setMeasurementConsent()} passes on a person's consent to open and click measurement.
+ *  - Subscriptions — {@see notifySubscribers()}.
  *  - Widget auth — {@see generateHashedToken()} / {@see generateSubscribeToken()}.
  */
 class NotifizzClient
@@ -45,7 +46,7 @@ class NotifizzClient
 
     /**
      * @param string      $authSecretKey        used by generateHashedToken/generateSubscribeToken for widget auth.
-     * @param string      $sdkSecretKey         used by the tracking API + identity/subscription calls.
+     * @param string      $sdkSecretKey         used by the tracking API + identity calls.
      * @param string|null $webhookSigningSecret required to expose enrichers — verifies the HMAC in {@see dispatch()}.
      * @param array       $clientOptions        optional: ['schemaMode' => 'soft'|'strict', 'onError' => callable].
      *                                          schemaMode is overridden by env NOTIFIZZ_SCHEMA_MODE at boot.
@@ -286,12 +287,30 @@ class NotifizzClient
     // ── Identity (Audience) ───────────────────────────────────────────────
 
     /**
-     * Link two Subjects to the same Audience. Expected keys: environmentId,
-     * subjectA {type, identifier}, subjectB {type, identifier}.
-     * A link does not expire: call detach() to undo it.
-     * consentBasis is deprecated: accepted and ignored.
+     * Declare that two Subjects are the same person: link them to one Audience. A user id with an
+     * email address: the address joins the user id's Audience, never the reverse. Two user ids:
+     * subjectB joins subjectA's Audience. Missing Subjects are created and linked. A link does not
+     * expire: call detach() to undo it.
+     *
+     * Expected keys: subjectA {type, identifier}, subjectB {type, identifier}. environmentId is
+     * optional: the call acts in the environment of the SDK secret key, and any other id is
+     * refused.
+     *
+     * Refusals (the status of the exception's response, and the `error` field of its body):
+     *  - 401 invalid_sdk_key — missing or unknown SDK secret key;
+     *  - 403 environment_mismatch — environmentId is not the key's environment;
+     *  - 422 unsupported_subject_type, 422 invalid_subject_identifier;
+     *  - 422 identify_requires_a_client_id — two email addresses;
+     *  - 422 disposable_email_domain — in production, an address on a known disposable domain
+     *    (outside production the link is made, with `warnings`);
+     *  - 409 identity_conflict — another of your users already holds the address: final, nothing
+     *    is linked;
+     *  - 409 identity_concurrent_update — another call changed the same identities at the same
+     *    moment: nothing changed, call it again.
      *
      * @return array response body ({ action, audienceId? }).
+     * @throws \GuzzleHttp\Exception\ClientException when the API refuses the call (4xx): nothing was linked.
+     * @throws \GuzzleHttp\Exception\GuzzleException on a network failure or a 5xx.
      */
     public function identify(array $params): array
     {
@@ -300,10 +319,16 @@ class NotifizzClient
     }
 
     /**
-     * Remove a Subject from its Audience back into a solo Audience. Expected keys:
-     * environmentId, subject {type, identifier}.
+     * Remove a Subject from its Audience back into an Audience of its own. Expected keys:
+     * subject {type, identifier}; environmentId is optional, as for identify().
+     *
+     * Refusals, as for identify(): 401 invalid_sdk_key, 403 environment_mismatch,
+     * 422 unsupported_subject_type, 422 invalid_subject_identifier, and
+     * 409 identity_concurrent_update — nothing changed, call it again.
      *
      * @return array response body ({ action, subjectId? }).
+     * @throws \GuzzleHttp\Exception\ClientException when the API refuses the call (4xx): nothing was unlinked.
+     * @throws \GuzzleHttp\Exception\GuzzleException on a network failure or a 5xx.
      */
     public function detach(array $params): array
     {
@@ -311,54 +336,54 @@ class NotifizzClient
         return $this->postJson("{$baseUrl}/identity/detach", $params);
     }
 
+    // ── Measurement consent ───────────────────────────────────────────────
+
+    /**
+     * Tell Notifizz whether a person consents to the measurement of their email opens and clicks —
+     * or withdraws that consent. Call it once, when the answer is given or changes, not on every send.
+     *
+     * Expected keys: subject {type, identifier} — the person, by email address (EmailSubject) or by
+     * your user id (AppUserSubject), as for identify() — and consented, a bool. environmentId is
+     * optional, as for identify(). The signal reaches every Subject of that person in the
+     * environment of the SDK secret key; a person unknown there is created with it.
+     *
+     *  - A refusal (false) always wins: that person's opens and clicks are no longer measured,
+     *    whatever your organisation declared — emails already sent included.
+     *  - An agreement (true) is what "Only those who consented" measures. Under "All my recipients
+     *    have consented", everyone who has not refused is measured.
+     *  - Until your organisation has declared, nobody is measured: the signal is stored, and applies
+     *    from the declaration on.
+     *  - With a key from a non-production environment, the call is accepted and has no effect.
+     *
+     * The call is idempotent: sending the same value again changes nothing and keeps the date of
+     * the last change. The SDK does not retry it — on a network error or a 5xx, call it again until
+     * it succeeds: a withdrawal that never reaches Notifizz is not honoured.
+     *
+     * Refusals — nothing is written (the status of the exception's response, and the `error`
+     * field of its body):
+     *  - 401 invalid_sdk_key — missing or unknown SDK secret key;
+     *  - 403 environment_mismatch — environmentId is not the key's environment;
+     *  - 422 unsupported_subject_type — neither EmailSubject nor AppUserSubject;
+     *  - 422 invalid_subject_identifier — an empty identifier, or an EmailSubject that is not a
+     *    valid address;
+     *  - 422 invalid_consented — consented is not a bool (a string, 'false' included).
+     *
+     * @return array response body ({ action }: created, updated or unchanged).
+     * @throws \GuzzleHttp\Exception\ClientException when the API refuses the call (4xx): the signal was not recorded.
+     * @throws \GuzzleHttp\Exception\GuzzleException on a network failure or a 5xx.
+     */
+    public function setMeasurementConsent(array $params): array
+    {
+        $baseUrl = $this->options['baseUrl'] ?? self::DEFAULT_BASE_URL;
+        return $this->postJson("{$baseUrl}/identity/measurement-consent", $params);
+    }
+
     // ── Subscriptions ─────────────────────────────────────────────────────
 
     /**
-     * Subscribe a user to a resource. Idempotent.
-     *
-     * @return array response body
-     */
-    public function subscribe(string $resourceId, string $subscriberId, array $meta = []): array
-    {
-        $baseUrl = $this->options['baseUrl'] ?? self::DEFAULT_BASE_URL;
-        $url = "{$baseUrl}/subscriptions/" . urlencode($resourceId) . "/subscribe";
-
-        $client = new Client();
-        $response = $client->post($url, [
-            'headers' => [
-                'Authorization' => "Bearer {$this->sdkSecretKey}",
-                'Content-Type' => 'application/json',
-            ],
-            'json' => array_merge(['subscriberId' => $subscriberId], $meta),
-        ]);
-
-        return json_decode($response->getBody()->getContents(), true);
-    }
-
-    /**
-     * Unsubscribe a user from a resource. No-op if not subscribed.
-     *
-     * @return array response body
-     */
-    public function unsubscribe(string $resourceId, string $subscriberId): array
-    {
-        $baseUrl = $this->options['baseUrl'] ?? self::DEFAULT_BASE_URL;
-        $url = "{$baseUrl}/subscriptions/" . urlencode($resourceId) . "/unsubscribe";
-
-        $client = new Client();
-        $response = $client->delete($url, [
-            'headers' => [
-                'Authorization' => "Bearer {$this->sdkSecretKey}",
-                'Content-Type' => 'application/json',
-            ],
-            'json' => ['subscriberId' => $subscriberId],
-        ]);
-
-        return json_decode($response->getBody()->getContents(), true);
-    }
-
-    /**
      * Notify all subscribers of a resource. Wrapper around track('subscription-entered', ...).
+     * A subscription itself is created only by the person's own click in the Subscribe widget:
+     * there is no server-side subscribe.
      */
     public function notifySubscribers(
         string $resourceId,

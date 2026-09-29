@@ -4,13 +4,35 @@ All notable changes to `notifizz/php` are documented in this file. Format follow
 
 ## [Unreleased]
 
-### Deprecated
+## [3.0.0] — 2026-09-29 (Breaking)
 
-- **`consentBasis` on `identify`.** The API accepts and ignores it: Notifizz does not record a legal basis for a link — as the controller, your organisation holds it. Omit it from the params.
+### Added
+
+- **`setMeasurementConsent(array $params)`** — tell Notifizz whether a person consents to the measurement of their email opens and clicks, or withdraws that consent. Keys: `subject` (`['type' => …, 'identifier' => …]` — the person, by email address `EmailSubject` or by your user id `AppUserSubject`, as for `identify`) and `consented`, a `bool`. Call it once, when the answer is given or changes — not on every send.
+
+  ```php
+  $result = $client->setMeasurementConsent([
+      'subject' => ['type' => 'EmailSubject', 'identifier' => 'alice@example.com'],
+      'consented' => false,
+  ]);
+  // $result['action'] → 'created' | 'updated' | 'unchanged'
+  ```
+
+  A refusal always wins, emails already sent included. An agreement is what *Only those who consented* measures. Until your organisation has declared, nobody is measured: the signal is stored and applies from the declaration on. With a key from a non-production environment, the call is accepted and has no effect. `consented` must be a real `bool` — a string, `'false'` included, is refused (`invalid_consented`) and nothing is written. A refused call throws Guzzle's `ClientException` (4xx), as `identify` and `detach` do: its response carries the status, and the `error` field of its body names the refusal. The call is idempotent and the SDK does not retry it: on a network error or a 5xx, call it again until it succeeds — a withdrawal that never reaches Notifizz is not honoured.
 
 ### Removed
 
+- **`subscribe($resourceId, $subscriberId, $meta = [])` and `unsubscribe($resourceId, $subscriberId)`.** They called a server-side subscription route that Notifizz does not serve: every call failed, in every environment — no subscription was ever created by it. A subscription is created only by the person's own click in the Subscribe widget. `notifySubscribers()` and `generateSubscribeToken()` are unchanged. Delete the calls.
 - **`expiresAt` on `identify`.** A link between two Subjects no longer carries an expiry date. The option was accepted but never enforced, and enforcing it would have split links that were meant to be permanent. To undo a link, call `detach`. A request that still sends `expiresAt` is accepted and the field is ignored.
+
+### Changed
+
+- **`environmentId` is optional** in the params of `identify`, `detach` and `setMeasurementConsent`. The call acts in the environment of your SDK secret key; an `environmentId` that is not that environment is refused (`environment_mismatch`) and nothing is written.
+- **`identify` doc comment** describes what the API does. A user id with an email address: the address joins the user id's Audience, never the reverse. Two user ids: `subjectB` joins `subjectA`'s Audience. Two email addresses are refused (`identify_requires_a_client_id`), and so is an address another of your users already holds (`identity_conflict`).
+
+### Deprecated
+
+- **`consentBasis` on `identify`.** The API accepts and ignores it: Notifizz does not record a legal basis for a link — as the controller, your organisation holds it. Omit it from the params.
 
 ## [2.1.0] — 2026-08-04
 
@@ -46,7 +68,7 @@ The PHP SDK now covers the same backend surface as `@notifizz/nodejs`. No new Co
 
 ### Breaking
 
-- **Removed `$client->send(...)`** that posted to `POST /v1/notification/channel/notificationcenter/config/:configId/track` — the underlying route was removed from the backend in [ADR 2026-04-27](../../../architecture/adr/2026-04-27-remove-direct-notificationcenter-track.md). Migrate to `$client->track($eventName, $properties)` and configure the matching campaign on the dashboard:
+- **Removed `$client->send(...)`** — sending straight to a Notification Center configuration bypassed campaigns, and that path is gone: a campaign decides channel and recipients server-side. Migrate to `$client->track($eventName, $properties)` and configure the matching campaign on the dashboard:
 
   ```php
   // before
@@ -67,7 +89,7 @@ The PHP SDK now covers the same backend surface as `@notifizz/nodejs`. No new Co
 
   The campaign listening on `user.welcomed` targets the same NC config previously addressed as `notifId`, and the orchestrator resolves recipients from `properties.userId`.
 
-- **Removed the chained `$client->track($props)->workflow($slug, $recipients)` shape** ([ADR 2026-04-26](../../../architecture/adr/2026-04-26-remove-workflow-from-sdk.md), commit `245ad45e`). The flat shape is now the only API:
+- **Removed the chained `$client->track($props)->workflow($slug, $recipients)` shape**. Recipients are no longer targeted from your code: the campaign matched by `eventName` resolves them server-side. The flat shape is now the only API:
 
   ```php
   $client->track($eventName, $properties = [], ?string $idempotencyKey = null);
