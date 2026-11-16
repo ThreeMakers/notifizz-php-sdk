@@ -353,11 +353,13 @@ class NotifizzClient
      *    have consented", everyone who has not refused is measured.
      *  - Until your organisation has declared, nobody is measured: the signal is stored, and applies
      *    from the declaration on.
-     *  - With a key from a non-production environment, the call is accepted and has no effect.
+     *  - With a key from a non-production environment, the call is accepted and stored, but never
+     *    decides what is sent or measured: only production emails reach real recipients.
      *
      * The call is idempotent: sending the same value again changes nothing and keeps the date of
-     * the last change. The SDK does not retry it — on a network error or a 5xx, call it again until
-     * it succeeds: a withdrawal that never reaches Notifizz is not honoured.
+     * the last change. The SDK does not retry it — on a network error, a 5xx or a 409 with
+     * `identity_concurrent_update`, call it again until it succeeds: a withdrawal that never reaches
+     * Notifizz is not honoured.
      *
      * Refusals — nothing is written (the status of the exception's response, and the `error`
      * field of its body):
